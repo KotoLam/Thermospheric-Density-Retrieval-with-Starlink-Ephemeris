@@ -1,50 +1,34 @@
 function Ephemeris2DeltaE(processDate, inputPath, outputPath)
 
-fid = fopen('data/EOP-Last5Years.txt','r');
-%  ----------------------------------------------------------------------------------------------------
-% |  Date    MJD      x         y       UT1-UTC      LOD       dPsi    dEpsilon     dX        dY    DAT
-% |(0h UTC)           "         "          s          s          "        "          "         "     s
-%  ----------------------------------------------------------------------------------------------------
-while ~feof(fid)
-    tline = fgetl(fid);
-    k = strfind(tline,'NUM_OBSERVED_POINTS');
-    if (k ~= 0)
-        numrecsobs = str2num(tline(21:end));
-        tline = fgetl(fid);
-        for i=1:numrecsobs
-            eopdata(:,i) = fscanf(fid,'%i %d %d %i %f %f %f %f %f %f %f %f %i',[13 1]);
-        end
-        for i=1:4
-            tline = fgetl(fid);
-        end
-        numrecspred = str2num(tline(22:end));
-        tline = fgetl(fid);
-        for i=numrecsobs+1:numrecsobs+numrecspred
-            eopdata(:,i) = fscanf(fid,'%i %d %d %i %f %f %f %f %f %f %f %f %i',[13 1]);
-        end
-        break
-    end
+if isempty(regexp(processDate, '^\d{4}-\d{2}-\d{2}$', 'once'))
+    error('处理日期格式应为 "yyyy-mm-dd"');
 end
-fclose(fid);
 
-load("data/Z_DE440_Coeff.mat","DE440Coeff")
-load("data/Z_EGM2008_Coeff.mat","Cnm","Snm");
-load("data/Z_SW_Data.mat","swdata");
+foldersAll = dir(inputPath);
+isDir = [foldersAll.isdir];
+folderNames = {foldersAll(isDir).name};
+folderNames = folderNames(~ismember(folderNames, {'.', '..'}));
+folderNames = sort(folderNames);
+processFolders = folderNames(~cellfun(@isempty, regexp(folderNames, processDate)));
 
-AUX_VAR{1} = eopdata; AUX_VAR{2} = DE440Coeff;
-AUX_VAR{3} = Cnm; AUX_VAR{4} = Snm;
+if isempty(processFolders)
+    error('没有找到符合日期 %s 的文件夹', processDate);
+end
+
+eopdata = ReadEOPData(processDate);
+load("data/DE440_Coeff.mat","DE440Coeff")
+load("data/EGM2008_Coeff.mat","Cnm","Snm");
 
 if isunix && ~ismac
-    poolobj = gcp("nocreate"); % If no pool, do not create new one.
-    % delete(poolobj)
+    poolobj = gcp("nocreate");
     if isempty(poolobj)
-        parpool(20)
+        parpool(16)
     end
 end
 
-files = dir(fullfile(inputPath,sprintf("%s*",processDate),"*.mat"));
-MAX_COUNT_FILE = length(files);
+files = dir(fullfile(inputPath,processFolders{cnt_folder},"*.mat"));
 
+MAX_COUNT_FILE = length(files);
 fprintf("files counts: %d\n",MAX_COUNT_FILE)
 for cnt_file = 1:MAX_COUNT_FILE
     tic;
@@ -55,8 +39,9 @@ for cnt_file = 1:MAX_COUNT_FILE
     Vel_ECI = s.Vel_ECI;
     Cov = s.Cov;
 
-    % ind_d = length(Datevec_UTC); % 3 days
-    MAX_COUNT_TIME = 12*60+1; % 12 hours
+    
+    MAX_COUNT_TIME = 2*24*60+1; % 2天
+
     Datevec_UTC = Datevec_UTC(1:MAX_COUNT_TIME,:);
     Datetime_UTC = datetime(Datevec_UTC);
     r_ECI = Pos_ECI(1:MAX_COUNT_TIME,:)*1e3; % km -> m
@@ -70,18 +55,6 @@ for cnt_file = 1:MAX_COUNT_FILE
     v_ECEF = nan(size(v_ECI));
     OE_Osc = nan(MAX_COUNT_TIME,6);
     OE_Mean = nan(MAX_COUNT_TIME,6);
-    % parfor cnt_data=1:MAX_COUNT_TIME
-    %     Mjd_UTC_t = Mjd_UTC(cnt_data);
-    %     [r_ECEF_t,v_ECEF_t] = ECI2ECEF(Mjd_UTC_t,r_ECI(cnt_data,:),v_ECI(cnt_data,:),eopdata);
-    %     r_ECEF(cnt_data,:) = r_ECEF_t;
-    %     v_ECEF(cnt_data,:) = v_ECEF_t;
-    %     OE_Osc(cnt_data,:) = rv2OEOsc([r_ECI(cnt_data,:),v_ECI(cnt_data,:)]');
-    %     try % 存在OEOsc2rv时计算误差得到虚数导致error的情况，跳过该数据的运算
-    %         OE_Mean(cnt_data,:) = OEOsc2OEMeanEUK(Mjd_UTC_t,OE_Osc(cnt_data,:)',degree);
-    %     catch
-    %         continue;
-    %     end
-    % end
 
     DELTA_T = 60;
     STEP   = 60;   % [s] integration step size
@@ -286,8 +259,7 @@ for cnt_file = 1:MAX_COUNT_FILE
     if ~exist(outputDir, 'dir')
         mkdir(outputDir);
     end
-    pattern = '(\d+_STARLINK-\d+)';  % 匹配 "数字_STARLINK-数字"
-    outputname = regexp(files(cnt_file).name, pattern, 'tokens');
+    outputname = regexp(files(cnt_file).name, '(\d+_STARLINK-\d+)', 'tokens');
     if isempty(outputname)
         continue
     end
@@ -297,7 +269,6 @@ for cnt_file = 1:MAX_COUNT_FILE
 end
 
 end
-
 
 
 
