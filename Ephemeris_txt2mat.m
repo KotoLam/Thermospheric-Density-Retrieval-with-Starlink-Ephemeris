@@ -15,10 +15,11 @@ parfor cnt_file = 1:MAX_COUNT_FILE
     tic;
     fname = fullfile(files(cnt_file).folder,files(cnt_file).name);
     fid = fopen(fname);
-    date_str = strings(4321,1);
-    pos_ECI = nan(4321,3);
-    vel_ECI = nan(4321,3);
-    cov = nan(4321,21);
+    MAX_COUNT_TIME = 3*24*60+1; % 3天
+    date_str = strings(MAX_COUNT_TIME,1);
+    pos_ECI = nan(MAX_COUNT_TIME,3);
+    vel_ECI = nan(MAX_COUNT_TIME,3);
+    cov = nan(MAX_COUNT_TIME,21);
     epochCount=1;
     flag = 0;
     while(~feof(fid))
@@ -62,3 +63,5 @@ parfor cnt_file = 1:MAX_COUNT_FILE
 
 end
 end
+
+% Ephemeris_txt2mat("2025-06-29", "/home/data2/iono/Starlink/Ephemeris", "/home/data2/iono/Starlink/Ephemeris_mat")
