@@ -1,7 +1,11 @@
+%--------------------------------------------------------------------------
+%
+% Modified by Ou
+% 
+%--------------------------------------------------------------------------
 function acc = Accel_EarthGravity_Tides(mjd_UTC,r_Sun_ECI,r_Moon_ECI,r_Sat,Cnm,Snm,eopdata)
 %% CONSTANTS
 Arcs      = 3600*180/pi;         % Arcseconds per radian
-Rad       = pi/180;              % Radians per degree
 TT_TAI  = +32.184;          % TT-TAI time difference [s]
 % Arcseconds in a full circle
 TURNAS = 1296000.0;
@@ -9,20 +13,17 @@ TURNAS = 1296000.0;
 DAS2R = 4.848136811095359935899141e-6;
 % Julian Date of Modified Julian Date zero
 DJM0 = 2400000.5;
-% Earth rotation (derivative of GMST at J2000;
-% differs from inertial period by precession)
-omega_Earth = 15.04106717866910/3600*Rad;   % [rad/s]; WGS-84
 MJD_J2000 = 51544.5;                        % Modified Julian Date of J2000
 GM_Earth   = 0.3986004415E+15;         		% [m^3/s^2]; EGM2008
 GM_Sun     = 132712440041.279419e9; 		% [m^3/s^2]; DE440
 GM_Moon    = GM_Earth/81.3005682214972154;  % [m^3/s^2]; DE440
 R_Earth = 0.63781363E+07;   % Earth's radius [m]; EGM2008
 
-n_max = 80; m_max = 80;
+n_max = 120; m_max = 120;
 Cnm = Cnm(1:n_max+1,1:m_max+1);
 Snm = Snm(1:n_max+1,1:m_max+1);
 %% ECI与ECEF的转换矩阵
-[x_pole,y_pole,UT1_UTC,LOD,dpsi,deps,dx_pole,dy_pole,TAI_UTC] = IERS(eopdata,mjd_UTC);
+[x_pole,y_pole,UT1_UTC,~,~,~,~,~,TAI_UTC] = IERS(eopdata,mjd_UTC);
 TT_UTC  = TT_TAI+TAI_UTC;   % TT-UTC time difference [s]
 mjd_UT1 = mjd_UTC + UT1_UTC/86400;
 mjd_TT = mjd_UTC + TT_UTC/86400;
@@ -32,7 +33,7 @@ NPB = iauPnm06a_mex(DJM0, mjd_TT);
 % Form Earth rotation matrix
 Theta = iauRz( iauGst06_mex(DJM0, mjd_UT1, DJM0, mjd_TT, NPB),eye(3) );
 % Polar motion matrix (TIRS->ITRS, IERS 2003)
-Pi = iauPom00(x_pole, y_pole, iauSp00(DJM0, mjd_TT));
+Pi = iauPom00_mex(x_pole, y_pole, iauSp00_mex(DJM0, mjd_TT));
 
 U = Pi*Theta*NPB; % ICRS to ITRS transformation
 
@@ -42,7 +43,6 @@ r_Moon_ECEF = U*r_Moon_ECI(:);
 r_Sun_ECEF = U*r_Sun_ECI(:);
 [lM, phiM, rM] = CalcPolarAngles(r_Moon_ECEF);
 [lS, phiS, rS] = CalcPolarAngles(r_Sun_ECEF);
-
 
 T  = (mjd_TT-MJD_J2000)/36525;
 T2 = T*T;
@@ -83,36 +83,46 @@ Om = mod((450160.398036-6962890.5431*T+7.4722*T2+0.007702*T3-0.00005939*T4),TURN
 % STEP1 CORRECTIONS
 [lgM, ~] = Legendre(2,2,phiM);
 [lgS, ~] = Legendre(2,2,phiS);
-sin_lM = sin(lM);
+sin_lM = sin(lM); 
+sin_2lM = sin(2*lM);
 cos_lM = cos(lM);
-dCnm20 = 0.30190/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,1)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,1) );
-dCnm21 = 0.29830/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,2)*cos_lM...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,2)*cos(lS) )...
-    -0.00144/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,2)*sin(lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,2)*sin(lS) );
-dSnm21 = 0.00144/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,2)*cos_lM...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,2)*cos(lS) )...
-    + 0.29830/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,2)*sin(lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,2)*sin(lS) );
-dCnm22 = 0.30102/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,3)*cos(2*lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,3)*cos(2*lS) )...
-    -0.00130/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,3)*sin(2*lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,3)*sin(2*lS) );
-dSnm22 = 0.00130/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,3)*cos(2*lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,3)*cos(2*lS) )...
-    + 0.30102/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,3)*sin(2*lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,3)*sin(2*lS) );
-dCnm40 = -0.00089/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,1)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,1) );
-dCnm41 = -0.00080/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,2)*cos(lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,2)*cos(lS) );
-dSnm41 = -0.00080/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,2)*sin(lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,2)*sin(lS) );
-dCnm42 = -0.00057/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,3)*cos(2*lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,3)*cos(2*lS) );
-dSnm42 = -0.00057/5*( GM_Moon/GM_Earth*(R_Earth/rM)^3*lgM(3,3)*sin(2*lM)...
-    + GM_Sun/GM_Earth*(R_Earth/rS)^3*lgS(3,3)*sin(2*lS) );
+cos_2lM = cos(2*lM);
+sin_lS = sin(lS); 
+sin_2lS = sin(2*lS);
+cos_lS = cos(lS);
+cos_2lS = cos(2*lS);
+
+GM_Moon_Term = GM_Moon/GM_Earth*(R_Earth/rM)^3;
+GM_Sun_Term  = GM_Sun/GM_Earth*(R_Earth/rS)^3;
+
+dCnm20 = 0.30190/5*( GM_Moon_Term*lgM(3,1)...
+    + GM_Sun_Term*lgS(3,1) );
+dCnm21 = 0.29830/5*( GM_Moon_Term*lgM(3,2)*cos_lM...
+    + GM_Sun_Term*lgS(3,2)*cos_lS )...
+    -0.00144/5*( GM_Moon_Term*lgM(3,2)*sin_lM...
+    + GM_Sun_Term*lgS(3,2)*sin_lS );
+dSnm21 = 0.00144/5*( GM_Moon_Term*lgM(3,2)*cos_lM...
+    + GM_Sun_Term*lgS(3,2)*cos_lS )...
+    + 0.29830/5*( GM_Moon_Term*lgM(3,2)*sin_lM...
+    + GM_Sun_Term*lgS(3,2)*sin_lS );
+dCnm22 = 0.30102/5*( GM_Moon_Term*lgM(3,3)*cos_2lM...
+    + GM_Sun_Term*lgS(3,3)*cos(2*lS) )...
+    -0.00130/5*( GM_Moon_Term*lgM(3,3)*sin_2lM...
+    + GM_Sun_Term*lgS(3,3)*sin_2lS );
+dSnm22 = 0.00130/5*( GM_Moon_Term*lgM(3,3)*cos_2lM...
+    + GM_Sun_Term*lgS(3,3)*cos_2lS )...
+    + 0.30102/5*( GM_Moon_Term*lgM(3,3)*sin_2lM...
+    + GM_Sun_Term*lgS(3,3)*sin_2lS );
+dCnm40 = -0.00089/5*( GM_Moon_Term*lgM(3,1)...
+    + GM_Sun_Term*lgS(3,1) );
+dCnm41 = -0.00080/5*( GM_Moon_Term*lgM(3,2)*cos_lM...
+    + GM_Sun_Term*lgS(3,2)*cos_lS );
+dSnm41 = -0.00080/5*( GM_Moon_Term*lgM(3,2)*sin_lM...
+    + GM_Sun_Term*lgS(3,2)*sin_lS );
+dCnm42 = -0.00057/5*( GM_Moon_Term*lgM(3,3)*cos_2lM...
+    + GM_Sun_Term*lgS(3,3)*cos_2lS );
+dSnm42 = -0.00057/5*( GM_Moon_Term*lgM(3,3)*sin_2lM...
+    + GM_Sun_Term*lgS(3,3)*sin_2lS );
 
 % STEP2 CORRECTIONS
 dC20 = 0;
@@ -122,7 +132,7 @@ for i=1:21
 end
 dCnm20 = dCnm20 + dC20;
 
-theta_g = iauGmst06(DJM0, mjd_UT1, DJM0, mjd_TT);
+theta_g = iauGmst06_mex(DJM0, mjd_UT1, DJM0, mjd_TT);
 
 dC21 = 0;
 dS21 = 0;
@@ -144,14 +154,6 @@ end
 dCnm22 = dCnm22 + dC22;
 dSnm22 = dSnm22 + dS22;
 
-%% Treatment of the Permanent Tide (anelastic Earth)
-% dC20 = 4.4228e-8*(-0.31460)*0.30190;
-% % Here 4.173e-9 is added to C20 to convert it to a tide-free system;
-% then, the permanent tide contribution is subtracted.
-% dCnm20 = dCnm20 + 4.173e-9 - dC20;
-% 经过验算，处理Permanent Tide会使结果变差
-% dC20 = 4.4228e-8*(-0.31460)*0.30190;
-% dCnm20 = dCnm20 - dC20; % EGM2008是Tide Free系统，无需转换
 %% Effect of Solid Earth Pole Tide (anelastic Earth)
 x_pole = x_pole*Arcs;
 y_pole = y_pole*Arcs;
@@ -206,19 +208,15 @@ for cnt_n=3:36
 end
 
 %% Body-fixed position
-[r_bf,~] = ECI2ECEF(mjd_UTC,r_Sat,r_Sat,eopdata);
+r_bf = U*r_Sat;
 
 % Auxiliary quantities
 d = norm(r_bf);                     % distance
 latgc = asin(r_bf(3)/d);
 lon = atan2(r_bf(2),r_bf(1));
 
-[pnm, dpnm] = Legendre_mex(n_max,m_max,latgc);
-
-dUdr = 0;
-dUdlatgc = 0;
-dUdlon = 0;
-q3 = 0; q2 = q3; q1 = q2;
+[pnm, dpnm] = Legendre(n_max,m_max,latgc);
+% [pnm, dpnm] = Legendre_mex(n_max,m_max,latgc);
 
 sin_m_lon = sin([0:m_max]*lon);
 cos_m_lon = cos([0:m_max]*lon);
@@ -227,22 +225,20 @@ C_cos_m_lon = Cnm.* repmat(cos_m_lon,n_max+1,1);
 S_sin_m_lon = Snm.* repmat(sin_m_lon,n_max+1,1);
 S_cos_m_lon = Snm.* repmat(cos_m_lon,n_max+1,1);
 
+C_plus_S = C_cos_m_lon + S_sin_m_lon;
+S_minus_C = S_cos_m_lon - C_sin_m_lon;
+
 b1 = (-GM_Earth/d^2)*(R_Earth/d).^[0:n_max].*([0:n_max]+1);
 b2 = (GM_Earth/d)*(R_Earth/d).^[0:n_max];
-b3 = (GM_Earth/d)*(R_Earth/d).^[0:n_max];
+b3 = b2;
 
-for n=0:n_max
-    for m=0:n
-        q1 = q1 + pnm(n+1,m+1)*(C_cos_m_lon(n+1,m+1)+S_sin_m_lon(n+1,m+1));
-        q2 = q2 + dpnm(n+1,m+1)*(C_cos_m_lon(n+1,m+1)+S_sin_m_lon(n+1,m+1));
-        q3 = q3 + m*pnm(n+1,m+1)*(S_cos_m_lon(n+1,m+1)-C_sin_m_lon(n+1,m+1));
-    end
-    dUdr     = dUdr     + q1*b1(n+1);
-    dUdlatgc = dUdlatgc + q2*b2(n+1);
-    dUdlon   = dUdlon   + q3*b3(n+1);
-    q3 = 0; q2 = q3; q1 = q2;
-end
+q1 = sum(pnm.*C_plus_S,2);
+q2 = sum(dpnm.*C_plus_S,2);
+q3 = sum(repmat([0:m_max],n_max+1,1).*pnm.*S_minus_C,2);
 
+dUdr = sum(q1'.*b1);
+dUdlatgc = sum(q2'.*b2);
+dUdlon = sum(q3'.*b3);
 %% Body-fixed acceleration
 r2xy = r_bf(1)^2+r_bf(2)^2;
 

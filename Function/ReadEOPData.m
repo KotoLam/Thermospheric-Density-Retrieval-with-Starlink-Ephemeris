@@ -1,6 +1,6 @@
 function eopdata = ReadEOPData(processDate)
 
-fid = fopen('data/EOP-Last5Years.txt','r');
+fid = fopen('Data/EOP-Last5Years.txt','r');
 %  ----------------------------------------------------------------------------------------------------
 % |  Date    MJD      x         y       UT1-UTC      LOD       dPsi    dEpsilon     dX        dY    DAT
 % |(0h UTC)           "         "          s          s          "        "          "         "     s
@@ -31,6 +31,6 @@ fclose(fid);
 dateVec = datevec(processDate);
 mjd = mjuliandate(dateVec);
 ind = find(mjd==eopdata(4,:),1,'first');
-eopdata = eopdata(:,ind-2:ind+2);
+eopdata = eopdata(:,ind-5:ind+5);
 
 end

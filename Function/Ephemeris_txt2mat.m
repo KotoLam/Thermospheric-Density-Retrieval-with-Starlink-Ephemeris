@@ -1,18 +1,12 @@
 function Ephemeris_txt2mat(processDate, inputPath, outputPath)
-
-if isunix && ~ismac
-    poolobj = gcp("nocreate");
-    if isempty(poolobj)
-        parpool(16)
-    end
-end
+fprintf("Start processing %s\n",processDate)
 
 files = dir(fullfile(inputPath,sprintf("%s*",processDate),"*.txt"));
 
 MAX_COUNT_FILE = length(files);
-fprintf("files counts: %d\n",MAX_COUNT_FILE)
+fprintf("%s Files Counts: %d\n",processDate,MAX_COUNT_FILE)
 parfor cnt_file = 1:MAX_COUNT_FILE
-    tic;
+    % tic;
     fname = fullfile(files(cnt_file).folder,files(cnt_file).name);
     fid = fopen(fname);
     MAX_COUNT_TIME = 3*24*60+1; % 3天
@@ -59,7 +53,7 @@ parfor cnt_file = 1:MAX_COUNT_FILE
         mkdir(outputDir);
     end
     save(fullfile(outputDir,outputname),"-fromstruct",s);
-    fprintf("%d/%d %s time:%.2fs\n",cnt_file,MAX_COUNT_FILE,outputname,toc)
+    % fprintf("%d/%d %s time:%.2fs\n",cnt_file,MAX_COUNT_FILE,outputname,toc)
 
 end
 end
