@@ -1,6 +1,6 @@
 function eopdata = ReadEOPData(processDate)
 
-fid = fopen('Data/EOP-Last5Years.txt','r');
+fid = fopen('EOP-Last5Years.txt','r');
 %  ----------------------------------------------------------------------------------------------------
 % |  Date    MJD      x         y       UT1-UTC      LOD       dPsi    dEpsilon     dX        dY    DAT
 % |(0h UTC)           "         "          s          s          "        "          "         "     s

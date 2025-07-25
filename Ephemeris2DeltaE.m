@@ -15,11 +15,12 @@ if isempty(processFolders)
     error('没有找到符合日期 %s 的文件夹', processDate);
 end
 
+addpath("Data")
 addpath("Function")
 
 eopdata = ReadEOPData(processDate);
-load("Data/DE440_Coeff.mat","DE440Coeff")
-load("Data/EGM2008_Coeff.mat","Cnm","Snm");
+load("DE440_Coeff.mat","DE440Coeff")
+load("EGM2008_Coeff.mat","Cnm","Snm");
 
 if isunix && ~ismac
     poolobj = gcp("nocreate");
